@@ -1,119 +1,153 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+		 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
-	<parent>
-		<groupId>org.springframework.boot</groupId>
-		<artifactId>spring-boot-starter-parent</artifactId>
-		<version>3.5.5</version>
-		<relativePath/> <!-- lookup parent from repository -->
-	</parent>
+
 	<groupId>com.adnan</groupId>
 	<artifactId>seatsync</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.1</version>
 	<name>seatsync</name>
-	<description>Ticket management platform</description>
-	<url/>
-	<licenses>
-		<license/>
-	</licenses>
-	<developers>
-		<developer/>
-	</developers>
-	<scm>
-		<connection/>
-		<developerConnection/>
-		<tag/>
-		<url/>
-	</scm>
+	<description>seatsync</description>
+
 	<properties>
-		<java.version>21</java.version>
-		<kotlin.version>1.9.25</kotlin.version>
+		<kotlin.code.style>official</kotlin.code.style>
+		<kotlin_version>2.2.20</kotlin_version>
+		<ktor_version>3.3.0</ktor_version>
+		<exposed_version>0.61.0</exposed_version>
+		<postgres_version>42.7.7</postgres_version>
+		<logback_version>1.4.14</logback_version>
+		<slf4j_version>2.0.9</slf4j_version>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<kotlin.compiler.incremental>true</kotlin.compiler.incremental>
+		<main.class>io.ktor.server.netty.EngineMain</main.class>
 	</properties>
+
 	<dependencies>
+		<!-- Ktor Server (Netty + routing + JSON + auth + logging + config yaml) -->
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-actuator</artifactId>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-core-jvm</artifactId>
+			<version>${ktor_version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-data-jpa</artifactId>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-netty-jvm</artifactId>
+			<version>${ktor_version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-security</artifactId>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-content-negotiation-jvm</artifactId>
+			<version>${ktor_version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-web</artifactId>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-serialization-kotlinx-json-jvm</artifactId>
+			<version>${ktor_version}</version>
 		</dependency>
 		<dependency>
-			<groupId>com.fasterxml.jackson.module</groupId>
-			<artifactId>jackson-module-kotlin</artifactId>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-auth-jvm</artifactId>
+			<version>${ktor_version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.jetbrains.kotlin</groupId>
-			<artifactId>kotlin-reflect</artifactId>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-auth-jwt-jvm</artifactId>
+			<version>${ktor_version}</version>
 		</dependency>
 		<dependency>
-			<groupId>org.jetbrains.kotlin</groupId>
-			<artifactId>kotlin-stdlib</artifactId>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-call-logging-jvm</artifactId>
+			<version>${ktor_version}</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.jetbrains.exposed/exposed-core -->
+		<dependency>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-config-yaml-jvm</artifactId>
+			<version>${ktor_version}</version>
+		</dependency>
+
+		<!-- Ktor HTTP Client (for external calls like DummyJSON) -->
+		<dependency>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-client-core-jvm</artifactId>
+			<version>${ktor_version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-client-cio-jvm</artifactId>
+			<version>${ktor_version}</version>
+		</dependency>
+		<dependency>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-client-content-negotiation-jvm</artifactId>
+			<version>${ktor_version}</version>
+		</dependency>
+
+		<!-- Exposed (SQL DSL / DAO / JDBC) -->
 		<dependency>
 			<groupId>org.jetbrains.exposed</groupId>
 			<artifactId>exposed-core</artifactId>
-			<version>0.61.0</version>
+			<version>${exposed_version}</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.jetbrains.exposed/exposed-jdbc -->
-		<dependency>
-			<groupId>org.jetbrains.exposed</groupId>
-			<artifactId>exposed-jdbc</artifactId>
-			<version>0.61.0</version>
-			<scope>runtime</scope>
-		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.jetbrains.exposed/exposed-dao -->
 		<dependency>
 			<groupId>org.jetbrains.exposed</groupId>
 			<artifactId>exposed-dao</artifactId>
-			<version>0.61.0</version>
+			<version>${exposed_version}</version>
 		</dependency>
-		<!-- https://mvnrepository.com/artifact/org.jetbrains.exposed/exposed-kotlin-datetime -->
+		<dependency>
+			<groupId>org.jetbrains.exposed</groupId>
+			<artifactId>exposed-jdbc</artifactId>
+			<version>${exposed_version}</version>
+		</dependency>
 		<dependency>
 			<groupId>org.jetbrains.exposed</groupId>
 			<artifactId>exposed-kotlin-datetime</artifactId>
-			<version>0.61.0</version>
-			<scope>runtime</scope>
+			<version>${exposed_version}</version>
 		</dependency>
 
-		<dependency>
-			<groupId>org.springframework.kafka</groupId>
-			<artifactId>spring-kafka</artifactId>
-		</dependency>
-
+		<!-- PostgreSQL JDBC driver (correct artifact) -->
 		<dependency>
 			<groupId>org.postgresql</groupId>
 			<artifactId>postgresql</artifactId>
+			<version>${postgres_version}</version>
 			<scope>runtime</scope>
 		</dependency>
+
+		<!-- Kafka client -->
 		<dependency>
-			<groupId>org.springframework.boot</groupId>
-			<artifactId>spring-boot-starter-test</artifactId>
+			<groupId>org.apache.kafka</groupId>
+			<artifactId>kafka-clients</artifactId>
+			<version>3.7.0</version>
+		</dependency>
+
+		<!-- Logging -->
+		<dependency>
+			<groupId>ch.qos.logback</groupId>
+			<artifactId>logback-classic</artifactId>
+			<version>${logback_version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.slf4j</groupId>
+			<artifactId>slf4j-api</artifactId>
+			<version>${slf4j_version}</version>
+		</dependency>
+
+		<!-- Kotlin test -->
+		<dependency>
+			<groupId>io.ktor</groupId>
+			<artifactId>ktor-server-test-host-jvm</artifactId>
+			<version>${ktor_version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.jetbrains.kotlin</groupId>
-			<artifactId>kotlin-test-junit5</artifactId>
+			<artifactId>kotlin-test-junit</artifactId>
+			<version>${kotlin_version}</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
-			<groupId>org.springframework.kafka</groupId>
-			<artifactId>spring-kafka-test</artifactId>
-			<scope>test</scope>
-		</dependency>
-		<dependency>
-			<groupId>org.springframework.security</groupId>
-			<artifactId>spring-security-test</artifactId>
+			<groupId>org.jetbrains.kotlinx</groupId>
+			<artifactId>kotlinx-coroutines-debug</artifactId>
+			<version>1.6.4</version>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>
@@ -121,43 +155,84 @@
 	<build>
 		<sourceDirectory>${project.basedir}/src/main/kotlin</sourceDirectory>
 		<testSourceDirectory>${project.basedir}/src/test/kotlin</testSourceDirectory>
+		<resources>
+			<resource>
+				<directory>${project.basedir}/src/main/resources</directory>
+			</resource>
+		</resources>
+
 		<plugins>
-			<plugin>
-				<groupId>org.springframework.boot</groupId>
-				<artifactId>spring-boot-maven-plugin</artifactId>
-			</plugin>
+			<!-- Kotlin compiler -->
 			<plugin>
 				<groupId>org.jetbrains.kotlin</groupId>
 				<artifactId>kotlin-maven-plugin</artifactId>
+				<version>${kotlin_version}</version>
 				<configuration>
-					<args>
-						<arg>-Xjsr305=strict</arg>
-					</args>
+					<jvmTarget>21</jvmTarget>
 					<compilerPlugins>
-						<plugin>spring</plugin>
-						<plugin>jpa</plugin>
-						<plugin>all-open</plugin>
+						<plugin>kotlinx-serialization</plugin>
 					</compilerPlugins>
-					<pluginOptions>
-						<option>all-open:annotation=jakarta.persistence.Entity</option>
-						<option>all-open:annotation=jakarta.persistence.MappedSuperclass</option>
-						<option>all-open:annotation=jakarta.persistence.Embeddable</option>
-					</pluginOptions>
 				</configuration>
 				<dependencies>
 					<dependency>
 						<groupId>org.jetbrains.kotlin</groupId>
-						<artifactId>kotlin-maven-allopen</artifactId>
-						<version>${kotlin.version}</version>
-					</dependency>
-					<dependency>
-						<groupId>org.jetbrains.kotlin</groupId>
-						<artifactId>kotlin-maven-noarg</artifactId>
-						<version>${kotlin.version}</version>
+						<artifactId>kotlin-maven-serialization</artifactId>
+						<version>${kotlin_version}</version>
 					</dependency>
 				</dependencies>
+				<executions>
+					<execution>
+						<id>compile</id>
+						<phase>compile</phase>
+						<goals><goal>compile</goal></goals>
+					</execution>
+					<execution>
+						<id>test-compile</id>
+						<phase>test-compile</phase>
+						<goals><goal>test-compile</goal></goals>
+					</execution>
+				</executions>
+			</plugin>
+
+			<!-- Run Ktor app -->
+			<plugin>
+				<groupId>org.codehaus.mojo</groupId>
+				<artifactId>exec-maven-plugin</artifactId>
+				<version>1.2.1</version>
+				<executions>
+					<execution>
+						<goals><goal>java</goal></goals>
+					</execution>
+				</executions>
+				<configuration>
+					<mainClass>${main.class}</mainClass>
+				</configuration>
+			</plugin>
+
+			<!-- Fat JAR -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-assembly-plugin</artifactId>
+				<version>2.6</version>
+				<configuration>
+					<descriptorRefs>
+						<descriptorRef>jar-with-dependencies</descriptorRef>
+					</descriptorRefs>
+					<archive>
+						<manifest>
+							<addClasspath>true</addClasspath>
+							<mainClass>${main.class}</mainClass>
+						</manifest>
+					</archive>
+				</configuration>
+				<executions>
+					<execution>
+						<id>assemble-all</id>
+						<phase>package</phase>
+						<goals><goal>single</goal></goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
-
 </project>

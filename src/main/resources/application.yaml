@@ -1,0 +1,93 @@
+# Ktor application configuration
+ktor:
+  # Toggle dev features (stacktraces, etc.). Do NOT enable in production.
+  development: ${KTOR_DEVELOPMENT:false}
+
+  deployment:
+    host: 0.0.0.0
+    port: ${PORT:8080}
+
+  # Common server plugins you’ll likely install in code
+  server:
+    # CallLogging is configured in code, but you can keep levels here for reference
+    # log-levels are typically handled by Logback (see logback.xml), not Ktor.
+    request-validation:
+      enabled: true
+
+# Database (Exposed). If you use Hikari, add its dependency and a hikari section.
+db:
+  url: ${DB_URL:jdbc:postgresql://localhost:5432/seatsync}
+  driver: ${DB_DRIVER:org.postgresql.Driver}
+  user: ${DB_USER:postgres}
+  password: ${DB_PASS:postgres}
+  # Optional pool hints (use if you add HikariCP)
+  pool:
+    maxPoolSize: ${DB_MAX_POOL_SIZE:10}
+    connectionTimeoutMs: ${DB_CONNECTION_TIMEOUT_MS:30000}
+
+# Kafka client config (consumer/producer)
+kafka:
+  enabled: ${KAFKA_ENABLED:true}
+  bootstrapServers: ${KAFKA_BOOTSTRAP:localhost:9092}
+  groupId: ${KAFKA_GROUP_ID:seatsync-consumer}
+  autoOffsetReset: ${KAFKA_AUTO_OFFSET_RESET:earliest}
+  topics:
+    purchaseRequests: ${KAFKA_TOPIC_PURCHASE:purchase-requests}
+    purchaseSuccess: ${KAFKA_TOPIC_PURCHASE_SUCCESS:purchase-success}
+    purchaseFailed: ${KAFKA_TOPIC_PURCHASE_FAILED:purchase-failed}
+  # Optional producer/consumer tuning
+  producer:
+    acks: ${KAFKA_PRODUCER_ACKS:all}
+    lingerMs: ${KAFKA_PRODUCER_LINGER_MS:0}
+    batchSize: ${KAFKA_PRODUCER_BATCH_SIZE:16384}
+  consumer:
+    maxPollRecords: ${KAFKA_CONSUMER_MAX_POLL_RECORDS:100}
+    sessionTimeoutMs: ${KAFKA_CONSUMER_SESSION_TIMEOUT_MS:10000}
+
+# Auth configuration
+auth:
+  # mode can be: jwt | dummyjson
+  mode: ${AUTH_MODE:jwt}
+
+  # JWT settings (used if mode=jwt)
+  jwt:
+    realm: ${JWT_REALM:seatsync}
+    issuer: ${JWT_ISSUER:http://localhost/}
+    audience: ${JWT_AUDIENCE:seatsync
+    secret: ${JWT_SECRET:dev-secret} # change in production!
+    # Optional clock skew and token leeway (seconds)
+    leeway: ${JWT_LEEWAY:5}
+
+  # DummyJSON settings (used if mode=dummyjson)
+  dummyjson:
+    baseUrl: ${DUMMYJSON_BASE_URL:https://dummyjson.com}
+    # Comma-separated list of users that should be treated as admins
+    adminUsers: ${ADMINS:1,2,3}
+
+# HTTP client timeouts (used by Ktor client if you call external APIs)
+httpClient:
+  connectTimeoutMs: ${HTTP_CONNECT_TIMEOUT_MS:5000}
+  requestTimeoutMs: ${HTTP_REQUEST_TIMEOUT_MS:10000}
+  socketTimeoutMs: ${HTTP_SOCKET_TIMEOUT_MS:15000}
+  # Optional default base URL for external calls (not enforced by Ktor)
+  baseUrl: ${HTTP_BASE_URL:}
+
+# CORS (optional): if you enable CORS in code, you can source allowed origins here
+cors:
+  enabled: ${CORS_ENABLED:false}
+  anyHost: ${CORS_ANY_HOST:true}
+  allowedHosts: ${CORS_ALLOWED_HOSTS:}
+  allowedHeaders: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type}
+  allowedMethods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,OPTIONS}
+
+# Health and observability toggles
+health:
+  path: ${HEALTH_PATH:/healthy}
+
+metrics:
+  enabled: ${METRICS_ENABLED:false}
+
+# Application-specific limits and business rules
+tickets:
+  maxPerRequestDefault: ${TICKETS_MAX_PER_REQUEST:5}
+  expireActiveAfterEvent: ${TICKETS_EXPIRE_AFTER_EVENT:true}
