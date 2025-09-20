@@ -3,6 +3,7 @@ package com.adnan.seatsync
 import com.adnan.seatsync.app.installHttp
 import com.adnan.seatsync.app.installKafkaConsumer
 import com.adnan.seatsync.app.installSecurity
+import com.adnan.seatsync.domain.expireIfPast
 import com.adnan.seatsync.infra.db.Events
 import com.adnan.seatsync.infra.db.Tickets
 import com.adnan.seatsync.infra.repository.EventRepo
@@ -13,6 +14,10 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -59,6 +64,27 @@ fun main() {
                         installSecurity()
                         installHttp(eventRepo, ticketRepo)
                         installKafkaConsumer(eventRepo)
+
+                        // Start a background job that periodically expires tickets for past events.
+                        launch(Dispatchers.Default) {
+                                while (isActive) {
+                                        try {
+                                                val active = ticketRepo.allActive()
+                                                for (t in active) {
+                                                        val ev = eventRepo.get(t.eventId)
+                                                        if (ev != null) {
+                                                                val updated = expireIfPast(ev, t)
+                                                                if (updated != t) {
+                                                                        ticketRepo.update(updated)
+                                                                }
+                                                        }
+                                                }
+                                        } catch (_: Exception) {
+                                                // ignore and continue
+                                        }
+                                        delay(60_000)
+                                }
+                        }
                 }
                 .start(wait = true)
 }

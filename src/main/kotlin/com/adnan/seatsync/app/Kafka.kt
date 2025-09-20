@@ -14,10 +14,12 @@ import org.apache.kafka.clients.consumer.OffsetAndMetadata
 import org.apache.kafka.clients.producer.KafkaProducer
 import org.apache.kafka.clients.producer.ProducerRecord
 import org.apache.kafka.common.TopicPartition
+import org.slf4j.LoggerFactory
 
 data class PurchaseMsg(val userId: String, val eventId: String, val quantity: Int)
 
 fun Application.installKafkaConsumer(eventRepo: EventRepo) {
+    val logger = LoggerFactory.getLogger("KafkaConsumer")
     val cfg = environment.config
     val enabled =
             cfg.propertyOrNull("kafka.enabled")?.getString()?.toBoolean()
@@ -55,7 +57,15 @@ fun Application.installKafkaConsumer(eventRepo: EventRepo) {
                 put("enable.auto.commit", "false") // manual commit for at-least-once semantics
             }
 
-    val consumer = KafkaConsumer<String, String>(props).apply { subscribe(listOf(topicPurchase)) }
+    val consumer =
+            KafkaConsumer<String, String>(props).apply {
+                subscribe(listOf(topicPurchase))
+                logger.info(
+                        "Kafka consumer subscribed to topic={} groupId={}",
+                        topicPurchase,
+                        groupId
+                )
+            }
 
     // DLQ producer (simple) - use same bootstrap servers
     val prodProps =
@@ -76,19 +86,30 @@ fun Application.installKafkaConsumer(eventRepo: EventRepo) {
                             consumer.poll(Duration.ofSeconds(1))
                         } catch (e: Exception) {
                             // log and backoff
+                            logger.warn("Kafka poll error: {}", e.toString())
                             delay(1000)
                             continue
                         }
+                if (!recs.isEmpty) logger.debug("Polled {} records", recs.count())
                 for (r in recs) {
                     val recordKey = r.key()
                     val partition = r.partition()
                     val offset = r.offset()
+                    logger.debug(
+                            "Processing record topic={} partition={} offset={} key={} value={}",
+                            r.topic(),
+                            partition,
+                            offset,
+                            recordKey,
+                            r.value()
+                    )
                     try {
                         val msg =
                                 try {
                                     parsePurchase(r.value())
                                 } catch (e: Exception) {
                                     // malformed message -> send to DLQ and continue
+                                    logger.warn("Malformed message, sending to DLQ: {}", r.value())
                                     producer.send(ProducerRecord(dlqTopic, recordKey, r.value()))
                                     continue
                                 }
@@ -113,17 +134,31 @@ fun Application.installKafkaConsumer(eventRepo: EventRepo) {
                         var processedOk = false
                         res.fold(
                                 { /*domain error - move to DLQ for manual inspection*/
+                                    logger.warn("Domain error processing purchase: {}", it)
                                     producer.send(ProducerRecord(dlqTopic, recordKey, r.value()))
                                 },
                                 { tickets ->
+                                    logger.info(
+                                            "Attempting to persist {} tickets for user {} event {}",
+                                            tickets.size,
+                                            msg.userId,
+                                            msg.eventId
+                                    )
                                     val ok = eventRepo.tryPurchaseAndInsertTickets(tickets)
                                     if (!ok) {
                                         // not enough capacity -> move to DLQ or log
+                                        logger.warn("Not enough capacity, sending to DLQ")
                                         producer.send(
                                                 ProducerRecord(dlqTopic, recordKey, r.value())
                                         )
                                     } else {
                                         processedOk = true
+                                        logger.info(
+                                                "Successfully processed purchase for user {} event {} qty {}",
+                                                msg.userId,
+                                                msg.eventId,
+                                                msg.quantity
+                                        )
                                     }
                                 }
                         )
@@ -133,9 +168,15 @@ fun Application.installKafkaConsumer(eventRepo: EventRepo) {
                             val tp = TopicPartition(r.topic(), partition)
                             val meta = OffsetAndMetadata(offset + 1)
                             consumer.commitSync(mapOf(tp to meta))
+                            logger.debug(
+                                    "Committed offset {} for partition {}",
+                                    offset + 1,
+                                    partition
+                            )
                         }
                     } catch (e: Exception) {
                         // any unexpected error -> send to DLQ and continue
+                        logger.error("Unexpected error processing record: {}", e.toString())
                         try {
                             producer.send(ProducerRecord(dlqTopic, recordKey, r.value()))
                         } catch (_: Exception) {}

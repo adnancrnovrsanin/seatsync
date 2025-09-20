@@ -159,6 +159,13 @@ fun Application.installHttp(eventRepo: EventRepo, ticketRepo: TicketRepo) {
                                 )
                         is Either.Right -> {
                             ticketRepo.update(r.value)
+                            // Decrement purchased count for the event since the ticket is returned
+                            try {
+                                eventRepo.decPurchased(t.eventId, 1)
+                            } catch (_: Exception) {
+                                // best-effort: if decrement fails, continue — DB will be eventually
+                                // consistent
+                            }
                             call.respond(HttpStatusCode.OK)
                         }
                     }
