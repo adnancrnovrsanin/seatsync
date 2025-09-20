@@ -1,18 +1,9 @@
-# Ktor application configuration
 ktor:
-  # Toggle dev features (stacktraces, etc.). Do NOT enable in production.
-  development: ${KTOR_DEVELOPMENT:false}
-
+  application:
+    modules:
+      - com.adnan.seatsync.SeatsyncApplicationKt.module
   deployment:
-    host: 0.0.0.0
-    port: ${PORT:8080}
-
-  # Common server plugins you’ll likely install in code
-  server:
-    # CallLogging is configured in code, but you can keep levels here for reference
-    # log-levels are typically handled by Logback (see logback.xml), not Ktor.
-    request-validation:
-      enabled: true
+    port: 8080
 
 # Database (Exposed). If you use Hikari, add its dependency and a hikari section.
 db:

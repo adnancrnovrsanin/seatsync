@@ -1,0 +1,22 @@
+<configuration>
+  <!-- Console appender -->
+  <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+    <encoder>
+      <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} -- %msg%n</pattern>
+    </encoder>
+  </appender>
+
+  <!-- sensible defaults -->
+  <root level="INFO">
+    <appender-ref ref="STDOUT" />
+  </root>
+
+  <!-- Reduce noise from Kafka internals -->
+  <logger name="org.apache.kafka" level="WARN" />
+  <logger name="org.apache.zookeeper" level="WARN" />
+  <logger name="kafka" level="WARN" />
+
+  <!-- Keep Exposed and application logs at DEBUG during development if needed -->
+  <logger name="org.jetbrains.exposed" level="INFO" />
+  <logger name="com.adnan.seatsync" level="DEBUG" />
+</configuration>
