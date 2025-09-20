@@ -1,8 +1,8 @@
 package com.adnan.seatsync
 
-import com.adnan.seatsync.app.installHttp
-import com.adnan.seatsync.app.installKafkaConsumer
-import com.adnan.seatsync.app.installSecurity
+import com.adnan.seatsync.app.installAppSecurity
+import com.adnan.seatsync.app.installHttpEndpoints
+import com.adnan.seatsync.app.installPurchaseConsumer
 import com.adnan.seatsync.domain.expireIfPast
 import com.adnan.seatsync.infra.db.Events
 import com.adnan.seatsync.infra.db.Tickets
@@ -58,12 +58,20 @@ fun main() {
                         // Seed sample events when DB is empty
                         EventSeeder.seedIfEmpty(eventRepo)
 
-                        // Install content negotiation so Ktor can serialize Kotlin objects to JSON.
-                        install(ContentNegotiation) { json() }
+                        // Install content negotiation with tolerant JSON settings.
+                        install(ContentNegotiation) {
+                                json(
+                                        kotlinx.serialization.json.Json {
+                                                ignoreUnknownKeys = true
+                                                isLenient = true
+                                                explicitNulls = false
+                                        }
+                                )
+                        }
 
-                        installSecurity()
-                        installHttp(eventRepo, ticketRepo)
-                        installKafkaConsumer(eventRepo)
+                        installAppSecurity()
+                        installHttpEndpoints(eventRepo, ticketRepo)
+                        installPurchaseConsumer(eventRepo)
 
                         // Start a background job that periodically expires tickets for past events.
                         launch(Dispatchers.Default) {

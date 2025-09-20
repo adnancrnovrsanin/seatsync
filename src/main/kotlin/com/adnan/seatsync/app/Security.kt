@@ -1,67 +1,86 @@
 package com.adnan.seatsync.app
 
-import io.ktor.client.*
-import io.ktor.client.engine.cio.*
-import io.ktor.client.request.*
-import io.ktor.client.statement.*
-import io.ktor.http.*
-import io.ktor.server.application.*
+import com.auth0.jwt.JWT
+import com.auth0.jwt.algorithms.Algorithm
+import io.ktor.client.HttpClient
+import io.ktor.client.engine.cio.CIO
+import io.ktor.client.request.get
+import io.ktor.client.request.header
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.HttpHeaders
+import io.ktor.server.application.Application
+import io.ktor.server.application.ApplicationCall
+import io.ktor.server.application.install
 import io.ktor.server.auth.*
-import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.runBlocking
 
-data class Principal(val userId: String, val roles: Set<String>)
+data class AppPrincipal(val userId: String, val roles: Set<String>)
 
-// Simple in-memory cache for token -> userId mapping to avoid hitting DummyJSON on every request.
-private val tokenCache = mutableMapOf<String, String>()
-private val tokenCacheMutex = Mutex()
+// Simple in-memory cache (thread-safe) for token -> userId
+private val tokenCache = ConcurrentHashMap<String, String>()
 
-fun Application.installSecurity() {
+fun Application.installAppSecurity() {
     install(Authentication) {
         bearer("auth-bearer") {
-            authenticate { tokenCredential ->
-                val token = tokenCredential.token
+            authenticate { credentials: BearerTokenCredential ->
+                val token = credentials.token
 
-                // Try cache first
-                val cached = tokenCacheMutex.withLock { tokenCache[token] }
+                // 1) Try local JWT verification first (if JWT_SECRET is configured)
+                verifyLocalJwt(token)?.let { uid ->
+                    return@authenticate UserIdPrincipal(uid)
+                }
+
+                // 2) Otherwise fall back to DummyJSON access token validation (/user/me)
+                val cached = tokenCache[token]
                 val userId =
                         if (cached != null) cached
                         else {
-                            // Perform external auth call to DummyJSON
                             val http = HttpClient(CIO)
                             val resp =
                                     try {
-                                        http.get("https://dummyjson.com/auth/me") {
-                                            header(HttpHeaders.Authorization, "Bearer $token")
+                                        runBlocking {
+                                            http.get("https://dummyjson.com/user/me") {
+                                                header(HttpHeaders.Authorization, "Bearer $token")
+                                            }
                                         }
-                                    } catch (e: Exception) {
+                                    } catch (_: Exception) {
                                         null
                                     }
 
                             val uid =
-                                    if (resp != null && resp.status.isSuccess()) {
-                                        extractUserId(resp.bodyAsText())
+                                    if (resp != null && resp.status.value in 200..299) {
+                                        val text = runBlocking { resp.bodyAsText() }
+                                        extractUserId(text)
                                     } else null
-
-                            // cache successful lookups
-                            if (uid != null) tokenCacheMutex.withLock { tokenCache[token] = uid }
+                            if (uid != null) tokenCache[token] = uid
                             uid
                         }
-
                 if (userId != null) UserIdPrincipal(userId) else null
             }
         }
     }
 }
 
-suspend fun extractUserId(json: String): String {
-    // Try to extract common fields returned by DummyJSON (/auth/me)
-    val idRe = """"id"\s*:\s*(\d+)"""".toRegex()
-    val usernameRe = """"username"\s*:\s*"([^"]+)"""".toRegex()
-    val emailRe = """"email"\s*:\s*"([^"]+)"""".toRegex()
+private fun verifyLocalJwt(token: String): String? {
+    // Match Http.kt token creation defaults so local tokens work without env vars
+    val secret = System.getenv("JWT_SECRET") ?: "dev-secret"
+    val issuer = System.getenv("JWT_ISSUER") ?: "seatsync"
+    val algo = Algorithm.HMAC256(secret)
+    return try {
+        val verifier = JWT.require(algo).withIssuer(issuer).build()
+        val decoded = verifier.verify(token)
+        decoded.getClaim("userId")?.asString()?.takeIf { it.isNotBlank() } ?: decoded.subject
+    } catch (_: Exception) {
+        null
+    }
+}
 
+fun extractUserId(json: String): String {
+    val idRe = """"id"\s*:\s*(\n?\d+)""".toRegex()
+    val usernameRe = """"username"\s*:\s*"([^"]+)""".toRegex()
+    val emailRe = """"email"\s*:\s*"([^"]+)""".toRegex()
     idRe.find(json)?.groups?.get(1)?.value?.let {
         return it
     }
@@ -71,43 +90,42 @@ suspend fun extractUserId(json: String): String {
     emailRe.find(json)?.groups?.get(1)?.value?.let {
         return it
     }
-
     return json.hashCode().toString()
 }
 
-fun Route.Authenticated(block: Route.(Principal) -> Unit) {
-    authenticate("auth-bearer") {
-        route("") {
-            handle {
-                val pId = call.authentication.principal<UserIdPrincipal>()
-                if (pId == null) {
-                    call.respond(HttpStatusCode.Unauthorized)
-                    return@handle
-                }
-                val admins = System.getenv("ADMINS")?.split(",")?.toSet() ?: emptySet()
-                val roles = if (pId.name in admins) setOf("ADMIN") else emptySet()
-                block(Principal(pId.name, roles))
-            }
-        }
+// Note: Route wrappers removed to avoid intercept issues; use authenticate("auth-bearer") in routes
+// and call getAppPrincipal()/derivedRolesForToken() inside handlers for authorization.
+
+private fun ApplicationCall.derivedRolesForToken(): Set<String> {
+    val authHeader = request.headers[HttpHeaders.Authorization]
+    val bearer = authHeader?.takeIf { it.startsWith("Bearer ") }?.removePrefix("Bearer ")
+    if (!bearer.isNullOrBlank()) {
+        // Use same fallbacks as token generation
+        val secret = System.getenv("JWT_SECRET") ?: "dev-secret"
+        val issuer = System.getenv("JWT_ISSUER") ?: "seatsync"
+        try {
+            val algo = Algorithm.HMAC256(secret)
+            val verifier = JWT.require(algo).withIssuer(issuer).build()
+            val decoded = verifier.verify(bearer)
+            val roles = decoded.getClaim("roles").asList(String::class.java)?.toSet() ?: emptySet()
+            if (roles.isNotEmpty()) return roles
+        } catch (_: Exception) {}
     }
+    val pId = principal<UserIdPrincipal>()?.name
+    val admins =
+            System.getenv("ADMINS")
+                    ?.split(",")
+                    ?.map { it.trim() }
+                    ?.filter { it.isNotEmpty() }
+                    ?.toSet()
+                    ?: emptySet()
+    return if (pId != null && pId in admins) setOf("ADMIN") else emptySet()
 }
 
-fun Route.AdminOnly(block: Route.() -> Unit) {
-    authenticate("auth-bearer") {
-        route("") {
-            handle {
-                val pId = call.authentication.principal<UserIdPrincipal>()
-                if (pId == null) {
-                    call.respond(HttpStatusCode.Forbidden)
-                    return@handle
-                }
-                val admins = System.getenv("ADMINS")?.split(",")?.toSet() ?: emptySet()
-                if (pId.name !in admins) {
-                    call.respond(HttpStatusCode.Forbidden)
-                    return@handle
-                }
-                block()
-            }
-        }
-    }
+fun ApplicationCall.getAppPrincipal(): AppPrincipal? {
+    val p = principal<UserIdPrincipal>() ?: return null
+    val roles = derivedRolesForToken()
+    return AppPrincipal(p.name, roles)
 }
+
+// No separate roles cache; roles are derived per-call from JWT or ADMINS env.

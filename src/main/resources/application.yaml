@@ -44,7 +44,7 @@ auth:
   jwt:
     realm: ${JWT_REALM:seatsync}
     issuer: ${JWT_ISSUER:http://localhost/}
-    audience: ${JWT_AUDIENCE:seatsync
+    audience: ${JWT_AUDIENCE:seatsync}
     secret: ${JWT_SECRET:dev-secret} # change in production!
     # Optional clock skew and token leeway (seconds)
     leeway: ${JWT_LEEWAY:5}
